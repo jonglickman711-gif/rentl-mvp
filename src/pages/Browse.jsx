@@ -20,28 +20,42 @@ const pill = (active) => ({
   cursor: "pointer",
 });
 
-const badge = {
+const badge = (type) => ({
   fontSize: 11,
   padding: "4px 8px",
   borderRadius: 999,
   border: "1px solid #ddd",
   color: "#333",
-  background: "#fafafa",
-};
+  background: type === "community" ? "#fafafa" : "white",
+});
 
 export default function Browse() {
   const [q, setQ] = useState("");
   const [viewAs, setViewAs] = useState("public"); // "public" | "community"
+  const [showBoth, setShowBoth] = useState(false); // only used when viewAs === "community"
 
-  const filtered = useMemo(() => {
+  const visibleListings = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return mockListings;
-    return mockListings.filter((l) =>
-      [l.title, l.category, l.location, l.ownerName].some((x) =>
+
+    // 1) filter by role toggle
+    let pool = mockListings;
+
+    if (viewAs === "public") {
+      pool = pool.filter((l) => l.ownerType === "public");
+    } else {
+      // community view
+      pool = showBoth ? pool : pool.filter((l) => l.ownerType === "community");
+    }
+
+    // 2) filter by search
+    if (!query) return pool;
+
+    return pool.filter((l) =>
+      [l.title, l.category, l.location, l.ownerName, l.ownerType].some((x) =>
         String(x).toLowerCase().includes(query)
       )
     );
-  }, [q]);
+  }, [q, viewAs, showBoth]);
 
   return (
     <div>
@@ -51,9 +65,15 @@ export default function Browse() {
           <p style={{ color: "#444", marginTop: 0 }}>Explore what’s available near you.</p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "#666" }}>Viewing as</span>
-          <button onClick={() => setViewAs("public")} style={pill(viewAs === "public")}>
+          <button
+            onClick={() => {
+              setViewAs("public");
+              setShowBoth(false); // reset
+            }}
+            style={pill(viewAs === "public")}
+          >
             Public
           </button>
           <button onClick={() => setViewAs("community")} style={pill(viewAs === "community")}>
@@ -61,21 +81,30 @@ export default function Browse() {
           </button>
 
           {viewAs === "community" && (
-            <Link
-              to="/list-item"
-              style={{
-                marginLeft: 8,
-                padding: "8px 10px",
-                borderRadius: 12,
-                border: "1px solid #111",
-                background: "#111",
-                color: "white",
-                textDecoration: "none",
-              }}
-            >
-              List an Item
-            </Link>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#444" }}>
+              <input
+                type="checkbox"
+                checked={showBoth}
+                onChange={(e) => setShowBoth(e.target.checked)}
+              />
+              Show both (public + community)
+            </label>
           )}
+
+          {/* Always visible */}
+          <Link
+            to="/list-item"
+            style={{
+              padding: "8px 10px",
+              borderRadius: 12,
+              border: "1px solid #111",
+              background: "#111",
+              color: "white",
+              textDecoration: "none",
+            }}
+          >
+            List an Item
+          </Link>
         </div>
       </div>
 
@@ -92,14 +121,21 @@ export default function Browse() {
         }}
       />
 
+      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
+        Showing <b>{visibleListings.length}</b> items
+        {viewAs === "public" ? " (public only)" : showBoth ? " (public + community)" : " (community only)"}.
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 18 }}>
-        {filtered.map((l) => (
+        {visibleListings.map((l) => (
           <Link key={l.id} to={`/listing/${l.id}`} style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <div style={{ fontSize: 12, color: "#666" }}>
                 {l.category} • {l.location}
               </div>
-              <div style={badge}>{l.ownerType === "community" ? "Community" : "Public"}</div>
+              <div style={badge(l.ownerType)}>
+                {l.ownerType === "community" ? "Community" : "Public"}
+              </div>
             </div>
 
             <h3 style={{ margin: "8px 0" }}>{l.title}</h3>
@@ -109,15 +145,11 @@ export default function Browse() {
               <b>${l.pricePerDay}/day</b>
             </div>
 
-            {viewAs === "public" ? (
-              <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
-                Tip: request now, coordinate pickup after approval.
-              </div>
-            ) : (
-              <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
-                Community view: see how your listing appears publicly.
-              </div>
-            )}
+            <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
+              {viewAs === "public"
+                ? "Public view: request and coordinate pickup after approval."
+                : "Community view: see how inventory appears by segment."}
+            </div>
           </Link>
         ))}
       </div>

@@ -11,4 +11,12 @@ export const mockListings = [
   { id: "l10", title: "Cooler (Rolling) + Ice Packs", pricePerDay: 10, ownerName: "Jon", ownerType: "public",location: "West Village", category: "Outdoors", description: "Beach days, tailgates, boat days. Clean and sealed." },
   { id: "l11", title: "Car Seat (Infant) + Base", pricePerDay: 15, ownerName: "Rachel", ownerType: "community",location: "Carroll Gardens", category: "Family", description: "Clean, lightly used. Great for visiting family." },
   { id: "l12", title: "Tool Kit (Sockets + Wrenches)", pricePerDay: 14, ownerName: "Jon", ownerType: "community",location: "SoHo", category: "Tools", description: "Starter kit for basic repairs and furniture builds." },
+  { id: "l13", title: "Nintendo Switch (2 Joy-Cons)", pricePerDay: 14, ownerName: "Ava", ownerType: "public", location: "East Village", category: "Electronics", description: "Great for weekend hangs. Includes dock + charger." },
+  { id: "l14", title: "Pickleball Paddle Set (4)", pricePerDay: 9, ownerName: "Noah", ownerType: "public", location: "Astoria", category: "Outdoors", description: "4 paddles + balls. Quick pickup." },
+  { id: "l15", title: "Carry-On Luggage (Hard Shell)", pricePerDay: 8, ownerName: "Mia", ownerType: "public", location: "Chelsea", category: "Travel", description: "Clean hard-shell carry-on. Perfect for a 2–3 day trip." },
+  { id: "l16", title: "Basketball Hoop (Portable)", pricePerDay: 22, ownerName: "Rachel", ownerType: "community", location: "Greenpoint", category: "Sports", description: "Easy setup. Perfect for backyard games." },
+  { id: "l17", title: "Yoga Mat (Extra Thick)", pricePerDay: 8, ownerName: "Jaqueline", ownerType: "community", location: "Bed-Stuy", category: "Sports", description: "Extra thick mat for comfort. Great for yoga and stretching." },
+  { id: "l18", title: "Camping Stove (Propane)", pricePerDay: 16, ownerName: "Anna", ownerType: "public", location: "Bed-Stuy", category: "Outdoors", description: "Propane stove for cooking. Great for camping trips." },
+  { id: "l19", title: "Tent (4-person, Instant Setup)", pricePerDay: 24, ownerName: "Rachel", ownerType: "community", location: "Bed-Stuy", category: "Outdoors", description: "4-person tent with instant setup. Great for camping trips." },
+  { id: "l20", title: "Portable Grill (2-burner)", pricePerDay: 18, ownerName: "Jon", ownerType: "public", location: "Bed-Stuy", category: "Outdoors", description: "2-burner portable grill. Great for camping trips." },
 ];
