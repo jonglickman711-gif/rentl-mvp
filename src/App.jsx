@@ -8,6 +8,9 @@ import SignupPublic from "./pages/SignupPublic";
 import SignupCommunity from "./pages/SignupCommunity";
 import Browse from "./pages/Browse";
 import Dashboard from "./pages/Dashboard";
+import ListingDetails from "./pages/ListingDetails";
+import Playlists from "./pages/Playlists";
+import PlaylistDetails from "./pages/PlaylistDetails";
 
 export default function App() {
   return (
@@ -20,8 +23,13 @@ export default function App() {
           <Route path="/community" element={<SignupCommunity />} />
           <Route path="/browse" element={<Browse />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/listing/:id" element={<ListingDetails />} />
+          <Route path="/playlists" element={<Playlists />} />
+          <Route path="/playlists/:id" element={<PlaylistDetails />} />
         </Routes>
       </Layout>
     </Router>
   );
 }
+import Signup from "./pages/Signup";
