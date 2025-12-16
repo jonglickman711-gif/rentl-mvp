@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import ListingDetails from "./pages/ListingDetails";
 import Playlists from "./pages/Playlists";
 import PlaylistDetails from "./pages/PlaylistDetails";
+import ListItem from "./pages/ListItem";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/listing/:id" element={<ListingDetails />} />
           <Route path="/playlists" element={<Playlists />} />
           <Route path="/playlists/:id" element={<PlaylistDetails />} />
+          <Route path="/list-item" element={<ListItem />} />
         </Routes>
       </Layout>
     </Router>
