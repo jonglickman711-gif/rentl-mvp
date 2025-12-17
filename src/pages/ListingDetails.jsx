@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { mockListings } from "../data/MockListings";
+import { mockListings } from "../data/mockListings";
 
 export default function ListingDetails() {
   const { id } = useParams();
