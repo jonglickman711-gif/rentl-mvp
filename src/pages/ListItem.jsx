@@ -2,14 +2,16 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
 
+
+
 export default function ListItem() {
   const navigate = useNavigate();
-
+  
   // If store isn't wired correctly, this will throw.
   // We catch it so the page never goes blank.
-  let addListing;
+  let addListing, session;
   try {
-    ({ addListing } = useAppStore());
+    ({ addListing, session } = useAppStore());
   } catch (e) {
     return (
       <div style={{ padding: 24 }}>
@@ -28,21 +30,21 @@ export default function ListItem() {
   const [pricePerDay, setPricePerDay] = useState("");
   const [location, setLocation] = useState("NYC");
   const [category, setCategory] = useState("Party");
-  const [ownerName, setOwnerName] = useState("Jon");
-  const [ownerType, setOwnerType] = useState("community");
+  
   const [description, setDescription] = useState("");
 
-  const canSubmit = title.trim() && Number(pricePerDay) > 0 && description.trim();
+  const canSubmit = title.trim() && Number(pricePerDay) > 0 && description.trim() && session;
 
   const submit = () => {
-    if (!canSubmit) return;
-
+    if (!canSubmit || !session) return;
+    
     const newListing = {
       id: `l${Date.now()}`,
       title: title.trim(),
       pricePerDay: Number(pricePerDay),
-      ownerName,
-      ownerType,
+      ownerId: session.id,
+      ownerName: session.name,
+      ownerType: session.role,
       location,
       category,
       description: description.trim(),
@@ -56,6 +58,15 @@ export default function ListItem() {
     <div style={{ padding: 24 }}>
       <h1>List an Item</h1>
       <p style={{ color: "#444" }}>MVP: adds listing in-memory (later swaps to database).</p>
+      {session ? (
+        <p style={{ color: "#444" }}>
+          Listing as <strong>{session.name}</strong> ({session.role})
+        </p>
+      ) : (
+        <p style={{ color: "#b00020" }}>
+          Start a session above before creating a listing.
+        </p>
+      )}
 
       <div style={{ display: "grid", gap: 10, maxWidth: 520 }}>
         <Field label="Title">
@@ -79,17 +90,6 @@ export default function ListItem() {
 
         <Field label="Location">
           <input value={location} onChange={(e) => setLocation(e.target.value)} style={input} placeholder="e.g., Brooklyn" />
-        </Field>
-
-        <Field label="Owner name">
-          <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={input} placeholder="e.g., Ava" />
-        </Field>
-
-        <Field label="Owner type">
-          <select value={ownerType} onChange={(e) => setOwnerType(e.target.value)} style={input}>
-            <option value="community">Community</option>
-            <option value="public">Public</option>
-          </select>
         </Field>
 
         <Field label="Description">
