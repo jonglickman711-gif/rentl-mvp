@@ -12,11 +12,14 @@ import ListingDetails from "./pages/ListingDetails";
 import Playlists from "./pages/Playlists";
 import PlaylistDetails from "./pages/PlaylistDetails";
 import ListItem from "./pages/ListItem";
+import SessionBar from "./components/SessionBar";
+
 
 export default function App() {
   return (
     <Router>
       <Layout>
+        <SessionBar />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/get-started" element={<GetStarted />} />
