@@ -6,13 +6,15 @@ import { useAppStore } from "../store/AppStore";
 
 export default function ListItem() {
   const navigate = useNavigate();
-  
+
   // If store isn't wired correctly, this will throw.
   // We catch it so the page never goes blank.
   let addListing, session;
-  try {
-    ({ addListing, session } = useAppStore());
-  } catch (e) {
+
+try {
+  const { addListing, session } = useAppStore();
+} catch (e) {
+
     return (
       <div style={{ padding: 24 }}>
         <h1>List an Item</h1>
@@ -33,18 +35,21 @@ export default function ListItem() {
   
   const [description, setDescription] = useState("");
 
-  const canSubmit = title.trim() && Number(pricePerDay) > 0 && description.trim() && session;
+  const canSubmit = title.trim() && Number(pricePerDay) > 0 && description.trim();
 
   const submit = () => {
-    if (!canSubmit || !session) return;
-    
+    if (!canSubmit) return;
+    if (!session) {
+      alert("Start a session first.");
+      return;
+    }    
     const newListing = {
       id: `l${Date.now()}`,
       title: title.trim(),
       pricePerDay: Number(pricePerDay),
       ownerId: session.id,
       ownerName: session.name,
-      ownerType: session.role,
+      ownerRole: session.role,
       location,
       category,
       description: description.trim(),
