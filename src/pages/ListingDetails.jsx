@@ -1,12 +1,14 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { mockListings } from "../data/mockListings";
+import { useAppStore } from "../store/AppStore";
 
 export default function ListingDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const listing = mockListings.find((l) => l.id === id);
+  const { listings } = useAppStore();
+  const listing = listings.find((l) => l.id === id);
 
   if (!listing) {
     return (

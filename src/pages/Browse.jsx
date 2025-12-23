@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { mockListings } from "../data/mockListings";
+import { useAppStore } from "../store/AppStore";
+
 
 const cardStyle = {
   border: "1px solid #ddd",
@@ -30,6 +31,7 @@ const badge = (type) => ({
 });
 
 export default function Browse() {
+  const { listings } = useAppStore();
   const [q, setQ] = useState("");
   const [viewAs, setViewAs] = useState("public"); // "public" | "community"
   const [showBoth, setShowBoth] = useState(false); // only used when viewAs === "community"
@@ -38,7 +40,7 @@ export default function Browse() {
     const query = q.trim().toLowerCase();
 
     // 1) filter by role toggle
-    let pool = mockListings;
+    let pool = listings;
 
     if (viewAs === "public") {
       pool = pool.filter((l) => l.ownerType === "public");
