@@ -3,6 +3,9 @@ import { useAppStore } from "../store/AppStore";
 
 export default function SessionBar() {
   const { session, loginAs, setRole, logout } = useAppStore();
+ 
+  console.log("SessionBar sees session:", session);
+  
   const [name, setName] = useState("");
   const [role, setLocalRole] = useState("public");
 
@@ -58,3 +61,4 @@ export default function SessionBar() {
     </div>
   );
 }
+

@@ -12,29 +12,41 @@ import ListingDetails from "./pages/ListingDetails";
 import Playlists from "./pages/Playlists";
 import PlaylistDetails from "./pages/PlaylistDetails";
 import ListItem from "./pages/ListItem";
-import SessionBar from "./components/SessionBar";
+import RequireSession from "./components/RequireSession";
+import RequestCommunity from "./pages/RequestCommunity";
+
 
 
 export default function App() {
   return (
     <Router>
       <Layout>
-        <SessionBar />
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/landing" element={<Landing />} />
           <Route path="/get-started" element={<GetStarted />} />
+
           <Route path="/public" element={<SignupPublic />} />
           <Route path="/community" element={<SignupCommunity />} />
+          <Route path="/request-community" element={<RequestCommunity />} />
+
+          <Route
+            path="/list-item"
+            element={
+              <RequireSession>
+                <ListItem />
+              </RequireSession>
+            }
+          />
+
           <Route path="/browse" element={<Browse />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard" element={<RequireSession><Dashboard /> </RequireSession>}/>
           <Route path="/listing/:id" element={<ListingDetails />} />
           <Route path="/playlists" element={<Playlists />} />
           <Route path="/playlists/:id" element={<PlaylistDetails />} />
-          <Route path="/list-item" element={<ListItem />} />
+          
         </Routes>
       </Layout>
     </Router>
   );
 }
-import Signup from "./pages/Signup";

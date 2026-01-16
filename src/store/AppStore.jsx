@@ -4,7 +4,22 @@ import { mockPlaylists as initialPlaylists } from "../data/mockPlaylists";
 
 const LS_KEY_LISTINGS = "rentl_listings_v1";
 const LS_KEY_REQUESTS = "rentl_requests_v1";
+const LS_KEY_USERS = "rentl_users_v1";
 const SESSION_KEY = "rentl_session";
+
+
+function loadUsers() {
+  try {
+    const raw = localStorage.getItem(LS_KEY_USERS);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(LS_KEY_USERS, JSON.stringify(users));
+}
 
 function loadListings() {
   try {
@@ -46,7 +61,7 @@ export function AppStoreProvider({ children }) {
 
   // ✅ session state must live inside the Provider (a component)
   const [session, setSession] = useState(() => loadSession());
-
+  console.log("AppStoreProvider session:", session);
   useEffect(() => {
     localStorage.setItem(LS_KEY_LISTINGS, JSON.stringify(listings));
   }, [listings]);
@@ -60,10 +75,28 @@ export function AppStoreProvider({ children }) {
     else localStorage.removeItem(SESSION_KEY);
   }, [session]);
 
-  const loginAs = ({ name, role }) => {
-    const id = `u_${Math.random().toString(16).slice(2)}`;
-    setSession({ id, name, role });
+  const loginAs = ({ name, role, communityCode }) => {
+    const cleanName = name.trim();
+    const code = (communityCode || "").trim().toUpperCase();
+    const key = `${cleanName.toLowerCase()}|${code}`; // stable per community
+  
+    const users = loadUsers();
+  
+    let id = users[key];
+    if (!id) {
+      id = `u_${Math.random().toString(16).slice(2)}`;
+      users[key] = id;
+      saveUsers(users);
+    }
+  
+    setSession({
+      id,
+      name: cleanName,
+      role,
+      communityCode: code || null,
+    });
   };
+  
 
   const setRole = (role) => {
     setSession((prev) => (prev ? { ...prev, role } : prev));
