@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
+import theme from "../styles/themes";
 
 const box = {
   border: "1px solid #ddd",
@@ -34,19 +35,47 @@ const btnLight = {
   cursor: "pointer",
 };
 
-const statusBadge = (status) => {
+const getStatusBadgeStyle = (status) => {
   const base = {
-    padding: "4px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    border: "1px solid #ddd",
-    background: "white",
-    color: "#111",
+    padding: `${theme.components.badge.paddingY} ${theme.components.badge.paddingX}`,
+    borderRadius: theme.components.badge.radius,
+    fontSize: theme.components.badge.fontSize,
+    fontWeight: theme.components.badge.fontWeight,
+    border: "1px solid",
+    textTransform: "capitalize",
+    fontFamily: theme.typography.fonts.primary,
+    letterSpacing: theme.typography.letterSpacing.tight,
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 
-  if (status === "approved") return { ...base, border: "1px solid #1b5e20", color: "#1b5e20" };
-  if (status === "declined") return { ...base, border: "1px solid #b00020", color: "#b00020" };
-  return { ...base, border: "1px solid #999", color: "#444" };
+  if (status === "approved") {
+    return {
+      ...base,
+      background: theme.components.badge.primary.bg,
+      color: theme.components.badge.primary.text,
+      borderColor: theme.components.badge.primary.border,
+    };
+  }
+
+  if (status === "declined") {
+    return {
+      ...base,
+      background: theme.components.badge.accent.bg,
+      color: theme.components.badge.accent.text,
+      borderColor: theme.components.badge.accent.border,
+    };
+  }
+
+  // pending or default
+  return {
+    ...base,
+    background: theme.components.badge.neutral.bg,
+    color: theme.components.badge.neutral.text,
+    borderColor: theme.components.badge.neutral.border,
+  };
 };
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
@@ -184,8 +213,8 @@ export default function Dashboard() {
             ) : (
               myRentalRequests.map((r) => (
                 <div key={r.id} style={box}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                    <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 800 }}>
                         Request for{" "}
                         <Link to={`/listing/${r.listingId}`} style={{ color: "#111" }}>
@@ -197,7 +226,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div style={statusBadge(r.status)}>{r.status}</div>
+                    <div style={getStatusBadgeStyle(r.status)}>{r.status}</div>
                   </div>
 
                   <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
@@ -257,8 +286,8 @@ export default function Dashboard() {
               ) : (
                 incomingRequests.map((r) => (
                   <div key={r.id} style={box}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                      <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                      <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 900 }}>
                           <b>{r.renterName}</b> requested{" "}
                           <Link to={`/listing/${r.listingId}`} style={{ color: "#111" }}>
@@ -270,7 +299,7 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      <div style={statusBadge(r.status)}>{r.status}</div>
+                      <div style={getStatusBadgeStyle(r.status)}>{r.status}</div>
                     </div>
 
                     <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -300,7 +329,7 @@ export default function Dashboard() {
                     </div>
 
                     <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
-                      Approving blocks the dates on the listing so renters can’t double-book.
+                      Approving blocks the dates on the listing so renters can't double-book.
                     </div>
                   </div>
                 ))
