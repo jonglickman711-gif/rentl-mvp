@@ -1,390 +1,519 @@
-import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAppStore } from "../store/AppStore";
+import theme from "../styles/themes";
+import ListingCard from "../components/ListingCard";
+import {
+  getEffectiveBrowseMode,
+  getVisibleListings,
+  getHiddenCommunityMatchCount,
+  getListingScope,
+} from "../selectors/browseSelectors";
+import { getAvailabilityHint, getAvailabilityData } from "../utils/availability";
+import { debounce } from "../utils/debounce";
 
-const cardStyle = {
-  border: "1px solid #ddd",
-  borderRadius: 14,
-  padding: 16,
-  textDecoration: "none",
-  color: "#111",
-  background: "white",
+// Page container
+const pageContainer = {
+  maxWidth: theme.components.container.maxWidth,
+  margin: "0 auto",
+  padding: `${theme.space[6]} ${theme.components.container.paddingX}`,
+  fontFamily: theme.typography.fonts.primary,
+  color: theme.colors.text,
 };
 
-const pill = (active) => ({
-  padding: "8px 10px",
-  borderRadius: 999,
-  border: "1px solid #ddd",
-  background: active ? "#111" : "white",
-  color: active ? "white" : "#111",
+// Header section
+const headerSection = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: theme.space[4],
+  flexWrap: "wrap",
+  marginBottom: theme.space[6],
+};
+
+const headerText = {
+  flex: 1,
+  minWidth: "250px",
+};
+
+const title = {
+  margin: 0,
+  marginBottom: theme.space[2],
+  fontSize: theme.typography.sizes["3xl"],
+  fontWeight: theme.typography.weights.bold,
+  lineHeight: theme.typography.lineHeights.tight,
+  color: theme.colors.text,
+};
+
+const subtitle = {
+  margin: 0,
+  fontSize: theme.typography.sizes.base,
+  color: theme.colors.textSubtle,
+  lineHeight: theme.typography.lineHeights.normal,
+};
+
+// Mode switch controls
+const controlsSection = {
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.space[3],
+  alignItems: "flex-end",
+};
+
+const modeSwitchRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: theme.space[2],
+  flexWrap: "wrap",
+};
+
+const modeLabel = {
+  fontSize: theme.typography.sizes.sm,
+  color: theme.colors.textSubtle,
+  fontWeight: theme.typography.weights.medium,
+};
+
+const modeButton = (active) => ({
+  padding: `${theme.space[2]} ${theme.space[3]}`,
+  borderRadius: theme.radius.pill,
+  border: `1px solid ${active ? theme.colors.primary : theme.colors.border}`,
+  background: active ? theme.colors.primary : theme.colors.bg,
+  color: active ? theme.colors.textOnDark : theme.colors.text,
   cursor: "pointer",
-  fontWeight: 800,
+  fontWeight: theme.typography.weights.semibold,
+  fontSize: theme.typography.sizes.sm,
+  transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
+  fontFamily: theme.typography.fonts.primary,
+  outline: "none",
 });
 
-const badge = (type) => ({
-  fontSize: 11,
-  padding: "4px 8px",
-  borderRadius: 999,
-  border: "1px solid #ddd",
-  color: "#333",
-  background: type === "community" ? "#fafafa" : "white",
-});
-
-const notice = {
-  marginTop: 12,
-  border: "1px solid #ffd7b5",
-  background: "#fff7ef",
-  borderRadius: 14,
-  padding: 12,
-  color: "#444",
-  fontSize: 13,
-  lineHeight: 1.5,
+const mixedModeToggle = {
+  display: "flex",
+  alignItems: "center",
+  gap: theme.space[2],
+  fontSize: theme.typography.sizes.xs,
+  color: theme.colors.textSubtle,
+  cursor: "pointer",
+  userSelect: "none",
 };
 
-function getScope(l) {
-  return l.visibility ?? l.ownerType ?? l.ownerRole;
-}
+// Search input
+const searchContainer = {
+  marginBottom: theme.space[4],
+};
 
-function matchesQuery(l, query) {
-  if (!query) return true;
-  const hay = [l.title, l.category, l.location, l.ownerName, getScope(l)].map((x) => String(x ?? "").toLowerCase());
-  return hay.some((x) => x.includes(query));
-}
+const searchInput = {
+  width: "100%",
+  maxWidth: "600px",
+  padding: `${theme.components.input.paddingY} ${theme.components.input.paddingX}`,
+  borderRadius: theme.components.input.radius,
+  border: `1px solid ${theme.components.input.border}`,
+  fontSize: theme.typography.sizes.base,
+  fontFamily: theme.typography.fonts.primary,
+  color: theme.colors.text,
+  background: theme.components.input.bg,
+  transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
+  outline: "none",
+};
 
-// Calculate availability ranges from blocked ranges (similar to ListingDetails)
-function calculateAvailabilityRanges(blockedRanges, minDate = new Date()) {
-  if (!blockedRanges || blockedRanges.length === 0) {
-    return [{ start: minDate, end: new Date(2099, 11, 31) }];
+// Notice/alert styles
+const notice = {
+  marginTop: theme.space[4],
+  marginBottom: theme.space[4],
+  padding: theme.space[4],
+  border: `1px solid ${theme.colors.warning}`,
+  background: theme.colors.accentSoft,
+  borderRadius: theme.components.card.radius,
+  color: theme.colors.text,
+  fontSize: theme.typography.sizes.sm,
+  lineHeight: theme.typography.lineHeights.relaxed,
+};
+
+const noticeTitle = {
+  fontWeight: theme.typography.weights.bold,
+  marginBottom: theme.space[2],
+  color: theme.colors.text,
+};
+
+const noticeActions = {
+  marginTop: theme.space[3],
+  display: "flex",
+  gap: theme.space[2],
+  flexWrap: "wrap",
+};
+
+const noticeButton = {
+  padding: `${theme.space[2]} ${theme.space[3]}`,
+  borderRadius: theme.components.button.radius,
+  border: `1px solid ${theme.colors.text}`,
+  background: theme.colors.text,
+  color: theme.colors.textOnDark,
+  textDecoration: "none",
+  fontWeight: theme.typography.weights.semibold,
+  fontSize: theme.typography.sizes.sm,
+  display: "inline-flex",
+  alignItems: "center",
+  transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
+};
+
+const noticeButtonSecondary = {
+  ...noticeButton,
+  background: theme.colors.bg,
+  color: theme.colors.text,
+  borderColor: theme.colors.border,
+};
+
+// Results summary
+const resultsSummary = {
+  marginBottom: theme.space[4],
+  fontSize: theme.typography.sizes.sm,
+  color: theme.colors.textSubtle,
+  fontFamily: theme.typography.fonts.primary,
+};
+
+// Grid layout
+const gridContainer = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+  gap: theme.space[4],
+  marginTop: theme.space[6],
+};
+
+// Empty state
+const emptyState = {
+  padding: theme.space[8],
+  textAlign: "center",
+  color: theme.colors.textMuted,
+  fontSize: theme.typography.sizes.base,
+  fontFamily: theme.typography.fonts.primary,
+};
+
+// CTA button
+const ctaButton = {
+  padding: `${theme.space[2]} ${theme.space[3]}`,
+  borderRadius: theme.components.button.radius,
+  border: `1px solid ${theme.colors.text}`,
+  background: theme.colors.text,
+  color: theme.colors.textOnDark,
+  textDecoration: "none",
+  fontWeight: theme.typography.weights.semibold,
+  fontSize: theme.typography.sizes.sm,
+  display: "inline-flex",
+  alignItems: "center",
+  transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
+  marginTop: theme.space[2],
+};
+
+/**
+ * Get mode-specific labels and helper text
+ */
+function getModeLabels(mode, session) {
+  if (mode === "public") {
+    return {
+      title: "Browse Public Listings",
+      subtitle: "Explore items available to everyone",
+      resultsLabel: "public listings",
+      emptyMessage: "No public listings found.",
+    };
   }
 
-  const normalizedMin = new Date(minDate);
-  normalizedMin.setHours(0, 0, 0, 0);
-
-  const sorted = [...blockedRanges]
-    .map((r) => ({
-      start: new Date(r.start),
-      end: new Date(r.end),
-    }))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-  const available = [];
-  let currentStart = normalizedMin;
-
-  for (const blocked of sorted) {
-    blocked.start.setHours(0, 0, 0, 0);
-    blocked.end.setHours(23, 59, 59, 999);
-
-    if (currentStart < blocked.start) {
-      const gapEnd = new Date(blocked.start);
-      gapEnd.setDate(gapEnd.getDate() - 1);
-      gapEnd.setHours(23, 59, 59, 999);
-      available.push({ start: new Date(currentStart), end: gapEnd });
-    }
-
-    currentStart = new Date(blocked.end);
-    currentStart.setDate(currentStart.getDate() + 1);
-    currentStart.setHours(0, 0, 0, 0);
+  if (mode === "community") {
+    const code = session?.communityCode;
+    return {
+      title: "Browse Community Listings",
+      subtitle: code
+        ? `Items from your community (${code})`
+        : "Items from your community",
+      resultsLabel: "community listings",
+      emptyMessage: code
+        ? `No community listings found for ${code}.`
+        : "No community listings found.",
+    };
   }
 
-  if (currentStart <= new Date(2099, 11, 31)) {
-    available.push({ start: currentStart, end: new Date(2099, 11, 31) });
-  }
-
-  return available;
-}
-
-// Compute human-readable availability hint
-function getAvailabilityHint(listing, requests) {
-  // Get approved requests for this listing
-  const approvedRequests = requests.filter(
-    (r) => r.listingId === listing.id && r.status === "approved"
-  );
-
-  // Combine blocked ranges from listing with approved request dates
-  const listingBlocked = Array.isArray(listing.blockedRanges) ? listing.blockedRanges : [];
-  const approvedRanges = approvedRequests
-    .filter((r) => r.startDate && r.endDate)
-    .map((r) => ({
-      start: r.startDate,
-      end: r.endDate,
-    }));
-
-  const allBlocked = [...listingBlocked, ...approvedRanges];
-  const availabilityRanges = calculateAvailabilityRanges(allBlocked);
-
-  if (availabilityRanges.length === 0) {
-    return "Limited availability";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Find the first available range that starts today or in the future
-  const nextAvailable = availabilityRanges.find((range) => {
-    const rangeStart = new Date(range.start);
-    rangeStart.setHours(0, 0, 0, 0);
-    return rangeStart >= today;
-  });
-
-  if (!nextAvailable) {
-    return "Limited availability";
-  }
-
-  const nextStart = new Date(nextAvailable.start);
-  nextStart.setHours(0, 0, 0, 0);
-
-  // Check if available today
-  if (nextStart.getTime() === today.getTime()) {
-    // Check if there are multiple blocks suggesting limited availability
-    if (allBlocked.length > 2) {
-      return "Available now (limited dates)";
-    }
-    return "Available now";
-  }
-
-  // Calculate days until next available
-  const daysUntil = Math.ceil((nextStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (daysUntil <= 3) {
-    if (daysUntil === 1) {
-      return "Available tomorrow";
-    }
-    return `Available in ${daysUntil} days`;
-  }
-
-  // Format date for display (e.g., "Jan 15")
-  const month = nextStart.toLocaleDateString("en-US", { month: "short" });
-  const day = nextStart.getDate();
-  return `Available ${month} ${day}`;
+  // mixed mode
+  return {
+    title: "Browse All Listings",
+    subtitle: "Public and community items",
+    resultsLabel: "listings (public + community)",
+    emptyMessage: "No listings found.",
+  };
 }
 
 export default function Browse() {
   const { listings, session, requests } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [q, setQ] = useState("");
-  const [viewAs, setViewAs] = useState("public"); // "public" | "community"
-  const [showBoth, setShowBoth] = useState(false);
+  // Initialize search from URL
+  const initialQuery = searchParams.get("q") || "";
+  const [searchInput, setSearchInput] = useState(initialQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
 
-  const query = q.trim().toLowerCase();
+  // Determine effective browse mode from session
+  const effectiveMode = useMemo(
+    () => getEffectiveBrowseMode(session),
+    [session]
+  );
 
-  // Can the signed in user see this specific community listing?
-  const canSeeCommunityListing = (l) => {
-    const listingCode = (l.communityCode || "").toUpperCase();
-    const userCode = (session?.communityCode || "").toUpperCase();
+  // Local mode state (can override effective mode)
+  const [currentMode, setCurrentMode] = useState(() => effectiveMode);
+  const [showMixed, setShowMixed] = useState(false);
 
-    if (!listingCode) return false;
-    if (!userCode) return false;
-    return listingCode === userCode;
+  // Sync mode when session changes
+  useEffect(() => {
+    const newEffectiveMode = getEffectiveBrowseMode(session);
+    setCurrentMode(newEffectiveMode);
+    setShowMixed(false);
+  }, [session]);
+
+  // Create stable debounced function using useRef
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+
+  const debouncedSearchRef = useRef(
+    debounce((query) => {
+      setDebouncedQuery(query);
+      const newParams = new URLSearchParams(window.location.search);
+      if (query.trim()) {
+        newParams.set("q", query);
+      } else {
+        newParams.delete("q");
+      }
+      setSearchParamsRef.current(newParams, { replace: true });
+    }, 300)
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    debouncedSearchRef.current(value);
   };
 
-  // What would a public user see (public listings only), with search applied?
-  const publicResults = useMemo(() => {
-    return listings
-      .filter((l) => getScope(l) === "public")
-      .filter((l) => matchesQuery(l, query));
-  }, [listings, query]);
-
-  // Hidden supply signal: are there community items that match this query, but are not visible in public?
-  const hiddenCommunityMatchCount = useMemo(() => {
-    if (!query) return 0;
-    return listings
-      .filter((l) => getScope(l) === "community")
-      .filter((l) => matchesQuery(l, query))
-      .length;
-  }, [listings, query]);
-
-  // What the current view actually shows
-  const visibleListings = useMemo(() => {
-    let pool = listings;
-
-    if (viewAs === "public") {
-      pool = pool.filter((l) => getScope(l) === "public");
-    } else {
-      // community view
-      if (showBoth) {
-        pool = pool.filter((l) => {
-          const scope = getScope(l);
-          if (scope === "public") return true;
-          if (scope === "community") return canSeeCommunityListing(l);
-          return false;
-        });
-      } else {
-        pool = pool.filter((l) => getScope(l) === "community" && canSeeCommunityListing(l));
-      }
+  // Sync URL param with local state on mount only
+  useEffect(() => {
+    const urlQ = searchParams.get("q") || "";
+    if (urlQ && urlQ !== searchInput) {
+      setSearchInput(urlQ);
+      setDebouncedQuery(urlQ);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
-    if (!query) return pool;
+  // Determine actual mode (mixed if enabled)
+  const actualMode = showMixed && currentMode === "community" ? "mixed" : currentMode;
 
-    return pool.filter((l) => matchesQuery(l, query));
-  }, [listings, viewAs, showBoth, query, session]);
+  // Get visible listings using selectors
+  const visibleListings = useMemo(() => {
+    try {
+      if (!listings || !Array.isArray(listings)) return [];
+      return getVisibleListings(listings, actualMode, session, debouncedQuery);
+    } catch (error) {
+      console.error("Error getting visible listings:", error);
+      return [];
+    }
+  }, [listings, actualMode, session, debouncedQuery]);
 
-  const needsCommunityCode = viewAs === "community" && !showBoth && !(session?.communityCode);
+  // Get hidden community match count for growth signals
+  const hiddenCommunityMatches = useMemo(() => {
+    try {
+      if (!listings || !Array.isArray(listings)) return 0;
+      return getHiddenCommunityMatchCount(listings, debouncedQuery);
+    } catch (error) {
+      console.error("Error getting hidden matches:", error);
+      return 0;
+    }
+  }, [listings, debouncedQuery]);
 
-  // Growth note: only show when in public view AND search yields 0 public results BUT hidden community matches exist
+  // Get public results count for growth signals
+  const publicResultsCount = useMemo(() => {
+    try {
+      if (!debouncedQuery.trim()) return 0;
+      if (!listings || !Array.isArray(listings)) return 0;
+      return getVisibleListings(listings, "public", null, debouncedQuery).length;
+    } catch (error) {
+      console.error("Error getting public results count:", error);
+      return 0;
+    }
+  }, [listings, debouncedQuery]);
+
+  // Mode labels
+  const modeLabels = useMemo(
+    () => getModeLabels(actualMode, session),
+    [actualMode, session]
+  );
+
+  // Check if needs community code
+  const needsCommunityCode =
+    actualMode === "community" && !session?.communityCode;
+
+  // Show hidden supply note
   const showHiddenSupplyNote =
-    viewAs === "public" &&
-    query.length > 0 &&
-    publicResults.length === 0 &&
-    hiddenCommunityMatchCount > 0;
+    actualMode === "public" &&
+    debouncedQuery.trim().length > 0 &&
+    publicResultsCount === 0 &&
+    hiddenCommunityMatches > 0;
+
+  // Safety check - ensure listings is an array
+  const safeListings = Array.isArray(listings) ? listings : [];
+  const safeRequests = Array.isArray(requests) ? requests : [];
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ marginBottom: 6 }}>Browse</h1>
-          <p style={{ color: "#444", marginTop: 0 }}>Explore what’s available near you.</p>
+    <div style={pageContainer}>
+      <style>{`
+        .mode-button:hover:not(:disabled) {
+          border-color: ${theme.colors.primary} !important;
+          background: ${theme.colors.primarySoft} !important;
+          color: ${theme.colors.primary} !important;
+        }
+        .mode-button:focus-visible {
+          outline: 2px solid ${theme.colors.focusRing};
+          outline-offset: 2px;
+        }
+        .search-input:focus {
+          border-color: ${theme.components.input.borderFocus} !important;
+          box-shadow: ${theme.components.input.shadowFocus} !important;
+        }
+        .listing-card:focus-visible {
+          outline: 2px solid ${theme.colors.focusRing};
+          outline-offset: 2px;
+        }
+      `}</style>
+
+      <div style={headerSection}>
+        <div style={headerText}>
+          <h1 style={title}>{modeLabels.title}</h1>
+          <p style={subtitle}>{modeLabels.subtitle}</p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#666" }}>Viewing as</span>
+        <div style={controlsSection}>
+          <div style={modeSwitchRow}>
+            <span style={modeLabel}>Viewing as</span>
+            <button
+              onClick={() => {
+                setCurrentMode("public");
+                setShowMixed(false);
+              }}
+              className="mode-button"
+              style={modeButton(currentMode === "public")}
+              disabled={!session}
+            >
+              Public
+            </button>
+            {session?.role === "community" && (
+              <>
+                <button
+                  onClick={() => {
+                    setCurrentMode("community");
+                    setShowMixed(false);
+                  }}
+                  className="mode-button"
+                  style={modeButton(currentMode === "community")}
+                >
+                  Community
+                </button>
+                {currentMode === "community" && (
+                  <label style={mixedModeToggle}>
+                    <input
+                      type="checkbox"
+                      checked={showMixed}
+                      onChange={(e) => setShowMixed(e.target.checked)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    Show both
+                  </label>
+                )}
+              </>
+            )}
+          </div>
 
-          <button
-            onClick={() => {
-              setViewAs("public");
-              setShowBoth(false);
-            }}
-            style={pill(viewAs === "public")}
-          >
-            Public
-          </button>
-
-          <button onClick={() => setViewAs("community")} style={pill(viewAs === "community")}>
-            Community
-          </button>
-
-          {viewAs === "community" ? (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#444" }}>
-              <input
-                type="checkbox"
-                checked={showBoth}
-                onChange={(e) => setShowBoth(e.target.checked)}
-              />
-              Show both (public + my community)
-            </label>
-          ) : null}
-
-          <Link
-            to="/list-item"
-            style={{
-              padding: "8px 10px",
-              borderRadius: 12,
-              border: "1px solid #111",
-              background: "#111",
-              color: "white",
-              textDecoration: "none",
-              fontWeight: 900,
-            }}
-          >
-            List an Item
-          </Link>
+          {session?.role === "community" && (
+            <Link to="/list-item" style={ctaButton}>
+              List an Item
+            </Link>
+          )}
         </div>
       </div>
 
-      {needsCommunityCode ? (
+      {needsCommunityCode && (
         <div style={notice}>
-          Community listings require a community code. Go to{" "}
-          <Link to="/get-started" style={{ color: "#111", fontWeight: 900 }}>
-            Get Started
-          </Link>{" "}
-          and sign in as a Community Member using your code.
-        </div>
-      ) : null}
-
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search items, category, location..."
-        style={{
-          padding: 10,
-          width: "100%",
-          maxWidth: 520,
-          borderRadius: 12,
-          border: "1px solid #ddd",
-          marginTop: 12,
-        }}
-      />
-
-      {showHiddenSupplyNote ? (
-        <div style={notice}>
-          <div style={{ fontWeight: 900, marginBottom: 4 }}>No public results for “{q.trim()}”</div>
+          <div style={noticeTitle}>Community listings require a community code</div>
           <div>
-            There are items matching this search inside communities nearby.
-            Want access? Help onboard your building or HOA.
+            Go to{" "}
+            <Link to="/get-started" style={{ color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
+              Get Started
+            </Link>{" "}
+            and sign in as a Community Member using your code.
           </div>
-          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link
-              to="/request-community"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #111",
-                background: "#111",
-                color: "white",
-                textDecoration: "none",
-                fontWeight: 900,
-              }}
-            >
+        </div>
+      )}
+
+      <div style={searchContainer}>
+        <input
+          type="text"
+          value={searchInput}
+          onChange={handleSearchChange}
+          placeholder="Search items, category, location..."
+          className="search-input"
+          style={searchInput}
+          aria-label="Search listings"
+        />
+      </div>
+
+      {showHiddenSupplyNote && (
+        <div style={notice}>
+          <div style={noticeTitle}>No public results for "{debouncedQuery.trim()}"</div>
+          <div>
+            There are items matching this search inside communities nearby. Want access? Help
+            onboard your building or HOA.
+          </div>
+          <div style={noticeActions}>
+            <Link to="/request-community" style={noticeButton}>
               Invite my community
             </Link>
-
-            <Link
-              to="/get-started"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #ddd",
-                background: "white",
-                color: "#111",
-                textDecoration: "none",
-                fontWeight: 900,
-              }}
-            >
+            <Link to="/get-started" style={noticeButtonSecondary}>
               Enter a community code
             </Link>
           </div>
         </div>
-      ) : null}
+      )}
 
-      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-        Showing <b>{visibleListings.length}</b> items{" "}
-        {viewAs === "public" ? "(public only)" : showBoth ? "(public + my community)" : "(my community only)"}.
+      <div style={resultsSummary}>
+        Showing <strong>{visibleListings.length}</strong> {modeLabels.resultsLabel}
+        {debouncedQuery.trim() && ` matching "${debouncedQuery.trim()}"`}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 18 }}>
-        {visibleListings.map((l) => {
-          const scope = getScope(l);
-
-          return (
-            <Link key={l.id} to={`/listing/${l.id}`} style={cardStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>
-                  {l.category} • {l.location}
-                </div>
-
-                <div style={badge(scope)}>{scope === "community" ? "Community" : "Public"}</div>
-              </div>
-
-              <h3 style={{ margin: "8px 0" }}>{l.title}</h3>
-
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-                <span style={{ color: "#444" }}>Owner: {l.ownerName}</span>
-                <b>${l.pricePerDay}/day</b>
-              </div>
-
-              <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
-                <div style={{ marginBottom: 4 }}>
-                  {scope === "public"
-                    ? "Public listing: request and coordinate after approval."
-                    : `Community listing${session?.communityCode ? ` • ${session.communityCode}` : ""}`}
-                </div>
-                <div style={{ color: "#444", fontWeight: 500, marginTop: 6 }}>
-                  {getAvailabilityHint(l, requests)}
-                </div>
-              </div>
+      {visibleListings.length === 0 ? (
+        <div style={emptyState}>
+          <p>{modeLabels.emptyMessage}</p>
+          {!session && (
+            <Link to="/get-started" style={ctaButton}>
+              Get Started
             </Link>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div style={gridContainer}>
+          {visibleListings.map((listing) => {
+            if (!listing || !listing.id) return null;
+            const scope = getListingScope(listing);
+            const availabilityStatus = getAvailabilityHint(listing, safeRequests);
+            const availabilityData = getAvailabilityData(listing, safeRequests);
+
+            return (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                visibilityScope={scope}
+                availabilityStatus={availabilityStatus}
+                communityCode={scope === "community" ? session?.communityCode : null}
+                showAvailabilityPlaceholder={false}
+                availabilityData={availabilityData}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
