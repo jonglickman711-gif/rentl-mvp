@@ -4,7 +4,6 @@ import { useAppStore } from "../store/AppStore";
 import AvailabilityCalendar from "../components/AvailabilityCalendar";
 
 function toISO(date) {
-  // Convert Date object to "YYYY-MM-DD" format
   if (!date) return "";
   const d = new Date(date);
   const year = d.getFullYear();
@@ -21,7 +20,6 @@ function isValidRange(start, end) {
 }
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
-  // inclusive overlap
   const aS = new Date(aStart).getTime();
   const aE = new Date(aEnd).getTime();
   const bS = new Date(bStart).getTime();
@@ -33,18 +31,14 @@ function formatRange(r) {
   return `${r.start} → ${r.end}`;
 }
 
-// Convert blocked ranges to availability ranges (inverse logic)
-// If there are blocked ranges, calculate available date ranges
 function calculateAvailabilityRanges(blockedRanges, minDate = new Date()) {
   if (!blockedRanges || blockedRanges.length === 0) {
-    // No blocked dates, so all dates from today onwards are available
-    return [{ start: minDate, end: new Date(2099, 11, 31) }]; // Far future date
+    return [{ start: minDate, end: new Date(2099, 11, 31) }];
   }
 
   const normalizedMin = new Date(minDate);
   normalizedMin.setHours(0, 0, 0, 0);
 
-  // Sort blocked ranges by start date
   const sorted = [...blockedRanges]
     .map((r) => ({
       start: new Date(r.start),
@@ -59,7 +53,6 @@ function calculateAvailabilityRanges(blockedRanges, minDate = new Date()) {
     blocked.start.setHours(0, 0, 0, 0);
     blocked.end.setHours(23, 59, 59, 999);
 
-    // If there's a gap before this blocked range, it's available
     if (currentStart < blocked.start) {
       const gapEnd = new Date(blocked.start);
       gapEnd.setDate(gapEnd.getDate() - 1);
@@ -67,19 +60,118 @@ function calculateAvailabilityRanges(blockedRanges, minDate = new Date()) {
       available.push({ start: new Date(currentStart), end: gapEnd });
     }
 
-    // Move currentStart to after this blocked range
     currentStart = new Date(blocked.end);
     currentStart.setDate(currentStart.getDate() + 1);
     currentStart.setHours(0, 0, 0, 0);
   }
 
-  // Add remaining available range after last blocked range
   if (currentStart <= new Date(2099, 11, 31)) {
     available.push({ start: currentStart, end: new Date(2099, 11, 31) });
   }
 
   return available;
 }
+
+function normalizeStr(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function tokenize(text) {
+  return normalizeStr(text)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function scoreRelated(baseListing, candidate) {
+  if (!baseListing || !candidate) return 0;
+
+  let score = 0;
+
+  // Same category is a strong signal
+  if (normalizeStr(candidate.category) && normalizeStr(candidate.category) === normalizeStr(baseListing.category)) {
+    score += 6;
+  }
+
+  // Title keyword overlap
+  const baseTokens = new Set(tokenize(`${baseListing.title} ${baseListing.description}`));
+  const candTokens = tokenize(`${candidate.title} ${candidate.description}`);
+
+  let overlapCount = 0;
+  for (const t of candTokens) {
+    if (baseTokens.has(t)) overlapCount += 1;
+  }
+  score += Math.min(overlapCount, 6); // cap
+
+  // Same location is mild signal
+  if (normalizeStr(candidate.location) && normalizeStr(candidate.location) === normalizeStr(baseListing.location)) {
+    score += 2;
+  }
+
+  return score;
+}
+
+const page = { padding: 24 };
+
+const backBtn = {
+  padding: "8px 12px",
+  borderRadius: 12,
+  border: "1px solid #ddd",
+  background: "white",
+  cursor: "pointer",
+};
+
+const badge = (active) => ({
+  fontSize: 12,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px solid #ddd",
+  background: active ? "#fafafa" : "white",
+  color: "#333",
+});
+
+const card = {
+  border: "1px solid #eee",
+  borderRadius: 16,
+  padding: 16,
+  background: "white",
+};
+
+const miniCard = {
+  textDecoration: "none",
+  color: "#111",
+  border: "1px solid #eee",
+  borderRadius: 14,
+  padding: 12,
+  background: "white",
+  display: "block",
+};
+
+const miniCardTitleRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 10,
+  alignItems: "baseline",
+  marginTop: 6,
+};
+
+const sectionTitle = {
+  fontWeight: 900,
+  marginBottom: 10,
+  marginTop: 18,
+};
+
+const pillSmall = {
+  fontSize: 11,
+  padding: "4px 10px",
+  borderRadius: 999,
+  border: "1px solid #eee",
+  background: "#fafafa",
+  color: "#444",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+};
 
 export default function ListingDetails() {
   const { id } = useParams();
@@ -93,52 +185,32 @@ export default function ListingDetails() {
 
   if (!listing) {
     return (
-      <div style={{ padding: 24 }}>
+      <div style={page}>
         <h1>Listing Not Found</h1>
-        <button
-          onClick={() => navigate("/browse")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 12,
-            border: "1px solid #ddd",
-            background: "white",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={() => navigate("/browse")} style={backBtn}>
           Back to Browse
         </button>
       </div>
     );
   }
 
-  // Get all requests for this listing
+  // Requests scoped to this listing
   const listingRequests = useMemo(() => {
     return requests.filter((r) => r.listingId === listing.id);
   }, [requests, listing.id]);
 
-  // Get approved requests - these should block dates
   const approvedRequests = useMemo(() => {
     return listingRequests.filter((r) => r.status === "approved");
   }, [listingRequests]);
 
-  // Get pending requests (excluding current user's pending requests to avoid self-warning)
   const pendingRequests = useMemo(() => {
-    return listingRequests.filter(
-      (r) => r.status === "pending" && r.renterId !== session?.id
-    );
+    return listingRequests.filter((r) => r.status === "pending" && r.renterId !== session?.id);
   }, [listingRequests, session?.id]);
 
-  // Combine blocked ranges from listing with approved request dates
   const allBlockedRanges = useMemo(() => {
     const listingBlocked = Array.isArray(listing.blockedRanges) ? listing.blockedRanges : [];
-    
-    // Add approved request dates as blocked ranges
-    const approvedRanges = approvedRequests.map((r) => ({
-      start: r.startDate,
-      end: r.endDate,
-    }));
+    const approvedRanges = approvedRequests.map((r) => ({ start: r.startDate, end: r.endDate }));
 
-    // Merge and deduplicate
     const all = [...listingBlocked, ...approvedRanges];
     const unique = [];
     const seen = new Set();
@@ -154,12 +226,10 @@ export default function ListingDetails() {
     return unique;
   }, [listing.blockedRanges, approvedRequests]);
 
-  // Calculate availability ranges from all blocked ranges
   const availabilityRanges = useMemo(() => {
     return calculateAvailabilityRanges(allBlockedRanges);
   }, [allBlockedRanges]);
 
-  // Check for overlap with blocked dates (approved requests + listing blocked ranges)
   const hasOverlap = useMemo(() => {
     if (!isValidRange(startDate, endDate)) return false;
     const startISO = toISO(startDate);
@@ -167,7 +237,6 @@ export default function ListingDetails() {
     return allBlockedRanges.some((r) => overlaps(startISO, endISO, r.start, r.end));
   }, [startDate, endDate, allBlockedRanges]);
 
-  // Check for overlap with pending requests (warning only)
   const hasPendingOverlap = useMemo(() => {
     if (!isValidRange(startDate, endDate)) return false;
     const startISO = toISO(startDate);
@@ -175,10 +244,7 @@ export default function ListingDetails() {
     return pendingRequests.some((r) => overlaps(startISO, endISO, r.startDate, r.endDate));
   }, [startDate, endDate, pendingRequests]);
 
-  const canRequest =
-    !!session &&
-    isValidRange(startDate, endDate) &&
-    !hasOverlap;
+  const canRequest = !!session && isValidRange(startDate, endDate) && !hasOverlap;
 
   const submitRequest = () => {
     if (!session) {
@@ -201,16 +267,13 @@ export default function ListingDetails() {
       id: `r${Date.now()}`,
       listingId: listing.id,
 
-      // renter
       renterId: session.id,
       renterName: session.name,
       renterRole: session.role,
 
-      // owner snapshot (handy for dashboard filtering and display)
       ownerId: listing.ownerId,
       ownerName: listing.ownerName,
 
-      // dates (convert Date objects to ISO strings)
       startDate: toISO(startDate),
       endDate: toISO(endDate),
 
@@ -226,42 +289,55 @@ export default function ListingDetails() {
   const scope = listing.visibility ?? listing.ownerType ?? listing.ownerRole;
   const scopeLabel = scope === "community" ? "Community" : "Public";
 
+  // One-ups
+  const oneUpsSameOwner = useMemo(() => {
+    const all = Array.isArray(listings) ? listings : [];
+    const ownerKey = normalizeStr(listing.ownerId || listing.ownerName);
+    const scoped = all
+      .filter((l) => l && l.id !== listing.id)
+      .filter((l) => normalizeStr(l.ownerId || l.ownerName) === ownerKey);
+
+    // Keep it tight and useful
+    return scoped.slice(0, 6);
+  }, [listings, listing.id, listing.ownerId, listing.ownerName]);
+
+  const oneUpsRelated = useMemo(() => {
+    const all = Array.isArray(listings) ? listings : [];
+    const candidates = all.filter((l) => l && l.id !== listing.id);
+
+    const scored = candidates
+      .map((c) => ({ listing: c, score: scoreRelated(listing, c) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((x) => x.listing);
+
+    // Fallback: same category only
+    if (scored.length > 0) return scored;
+
+    const sameCategory = candidates
+      .filter((c) => normalizeStr(c.category) === normalizeStr(listing.category))
+      .slice(0, 6);
+
+    return sameCategory;
+  }, [listings, listing.id, listing.category, listing.title, listing.description]);
+
   return (
-    <div style={{ padding: 24 }}>
-      <button
-        onClick={() => navigate("/browse")}
-        style={{
-          padding: "8px 12px",
-          borderRadius: 12,
-          border: "1px solid #ddd",
-          background: "white",
-          cursor: "pointer",
-        }}
-      >
+    <div style={page}>
+      <button onClick={() => navigate("/browse")} style={backBtn}>
         ← Back
       </button>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
         <h1 style={{ margin: 0 }}>{listing.title}</h1>
-        <span
-          style={{
-            fontSize: 12,
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid #ddd",
-            background: scope === "community" ? "#fafafa" : "white",
-            color: "#333",
-          }}
-        >
-          {scopeLabel}
-        </span>
+        <span style={badge(scope === "community")}>{scopeLabel}</span>
       </div>
 
       <div style={{ color: "#666", marginBottom: 10, marginTop: 6 }}>
         {listing.category} • {listing.location} • Owner: {listing.ownerName}
       </div>
 
-      <div style={{ border: "1px solid #eee", borderRadius: 16, padding: 16, background: "white" }}>
+      <div style={card}>
         <p style={{ marginTop: 0, color: "#333", lineHeight: 1.5 }}>{listing.description}</p>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
@@ -283,7 +359,7 @@ export default function ListingDetails() {
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 12, fontWeight: 500 }}>
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 12, fontWeight: 600 }}>
             Select rental dates
           </div>
           <AvailabilityCalendar
@@ -297,22 +373,22 @@ export default function ListingDetails() {
           />
         </div>
 
-        {/* Availability feedback */}
         <div style={{ marginTop: 16, fontSize: 13 }}>
           {!startDate || !endDate ? (
             <div style={{ color: "#666" }}>Select dates to check availability.</div>
           ) : !isValidRange(startDate, endDate) ? (
-            <div style={{ color: "#b00020", fontWeight: 700 }}>End date must be on or after start date.</div>
+            <div style={{ color: "#b00020", fontWeight: 800 }}>End date must be on or after start date.</div>
           ) : hasOverlap ? (
-            <div style={{ color: "#b00020", fontWeight: 700 }}>
+            <div style={{ color: "#b00020", fontWeight: 800 }}>
               Unavailable for those dates. These dates are already approved or blocked.
             </div>
           ) : hasPendingOverlap ? (
-            <div style={{ color: "#E4572E", fontWeight: 700 }}>
-              ⚠️ Warning: Another renter has a pending request for these dates. Your request may be declined if theirs is approved first.
+            <div style={{ color: "#E4572E", fontWeight: 800 }}>
+              ⚠️ Heads up: someone else has a pending request for these dates. If theirs gets approved first, yours may
+              be declined.
             </div>
           ) : (
-            <div style={{ color: "#1b5e20", fontWeight: 700 }}>Available for those dates.</div>
+            <div style={{ color: "#1b5e20", fontWeight: 800 }}>Available for those dates.</div>
           )}
         </div>
 
@@ -336,9 +412,73 @@ export default function ListingDetails() {
           MVP note: approvals block dates so other renters can’t double-book. Payments come later.
         </div>
 
-        {/* Blocked dates display */}
+        {/* One-ups */}
+        {(oneUpsSameOwner.length > 0 || oneUpsRelated.length > 0) && (
+          <div style={{ marginTop: 18 }}>
+            <div style={{ display: "grid", gap: 14 }}>
+              {oneUpsSameOwner.length > 0 && (
+                <div>
+                  <div style={sectionTitle}>One-ups from {listing.ownerName}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+                    {oneUpsSameOwner.map((l) => (
+                      <Link key={l.id} to={`/listing/${l.id}`} style={miniCard}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                          <span style={pillSmall}>Same owner</span>
+                          <span style={{ fontSize: 12, color: "#666" }}>${l.pricePerDay}/day</span>
+                        </div>
+                        <div style={miniCardTitleRow}>
+                          <b style={{ lineHeight: 1.2 }}>{l.title}</b>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+                          {l.category} • {l.location}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#777", marginTop: 8, lineHeight: 1.4 }}>
+                          {String(l.description || "").slice(0, 90)}
+                          {String(l.description || "").length > 90 ? "..." : ""}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {oneUpsRelated.length > 0 && (
+                <div>
+                  <div style={sectionTitle}>One-ups you might like</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+                    {oneUpsRelated.map((l) => (
+                      <Link key={l.id} to={`/listing/${l.id}`} style={miniCard}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+                          <span style={pillSmall}>Related</span>
+                          <span style={{ fontSize: 12, color: "#666" }}>${l.pricePerDay}/day</span>
+                        </div>
+                        <div style={miniCardTitleRow}>
+                          <b style={{ lineHeight: 1.2 }}>{l.title}</b>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+                          {l.category} • {l.location} • Owner: {l.ownerName}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#777", marginTop: 8, lineHeight: 1.4 }}>
+                          {String(l.description || "").slice(0, 90)}
+                          {String(l.description || "").length > 90 ? "..." : ""}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: 10, color: "#777", fontSize: 12 }}>
+              MVP note: one-ups are powered by category + keyword matching. Later: add tags, seller bundles, and “people
+              also rented” signals.
+            </div>
+          </div>
+        )}
+
+        {/* Unavailable dates */}
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Unavailable dates</div>
+          <div style={{ fontWeight: 900, marginBottom: 8 }}>Unavailable dates</div>
 
           {allBlockedRanges.length === 0 ? (
             <div style={{ fontSize: 13, color: "#666" }}>No blocked dates yet.</div>
@@ -363,10 +503,10 @@ export default function ListingDetails() {
           )}
         </div>
 
-        {/* Pending requests warning */}
+        {/* Pending requests */}
         {pendingRequests.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontWeight: 800, marginBottom: 8, color: "#E4572E" }}>
+            <div style={{ fontWeight: 900, marginBottom: 8, color: "#E4572E" }}>
               Pending requests (may affect availability)
             </div>
             <div style={{ display: "grid", gap: 8 }}>
@@ -392,3 +532,4 @@ export default function ListingDetails() {
     </div>
   );
 }
+  

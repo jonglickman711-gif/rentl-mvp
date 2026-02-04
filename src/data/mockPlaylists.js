@@ -3,40 +3,60 @@ export const mockPlaylists = [
     id: "p1",
     title: "Dinosaur Birthday Party",
     subtitle: "Backyard party bundle, dino-core and hassle-free",
+
+    // Core rentals that define the playlist
     itemIds: ["l1", "l5", "l6", "l7"],
-    upsell: ["Disposable table covers", "Extra extension cords", "Bubble machine"],
+
+    // Rentable add-ons (tie to real listings)
+    upsellIds: ["l9", "l13"],
+
+    // Non-rentable checklist items (consumables / bring-your-own)
+    checklist: ["Disposable table covers", "Extra extension cords", "Bubble machine"],
+
     notes: "Pro tip: book 2 days so you can set up the night before.",
   },
   {
     id: "p2",
     title: "Movie Night Hosting Kit",
     subtitle: "Turn any living room into a mini theater",
+
     itemIds: ["l4", "l7"],
-    upsell: ["Popcorn maker", "Floor pillows", "LED lights"],
+    upsellIds: ["l14", "l15"],
+    checklist: ["Floor pillows", "LED lights"],
+
     notes: "If you’re outdoors, add a white sheet and extra speakers.",
   },
   {
     id: "p3",
     title: "Weekend DIY Sprint",
     subtitle: "Everything to knock out that home project",
+
     itemIds: ["l3", "l8", "l12"],
-    upsell: ["Stud finder", "Laser level", "Extra drill bits"],
+    upsellIds: ["l16"],
+    checklist: ["Laser level", "Extra drill bits"],
+
     notes: "Bundle with anchors + tape measure for a smoother build.",
   },
   {
     id: "p4",
     title: "Beach or Boat Day",
     subtitle: "Don’t buy stuff you’ll use twice a year",
+
     itemIds: ["l10", "l2"],
-    upsell: ["Portable fan", "Dry bag", "Sunscreen station"],
+    upsellIds: ["l17"],
+    checklist: ["Dry bag", "Sunscreen station"],
+
     notes: "If it’s a boat day, add a floating handle for the GoPro.",
   },
   {
     id: "p5",
     title: "Family Visit Starter Pack",
     subtitle: "For when friends visit with a baby or toddler",
+
     itemIds: ["l11"],
-    upsell: ["Travel stroller", "Pack-and-play", "Bottle warmer"],
+    upsellIds: ["l18", "l19"],
+    checklist: ["Bottle warmer"],
+
     notes: "Future: verified-cleaning badge for family gear.",
   },
 ];

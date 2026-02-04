@@ -36,7 +36,7 @@ const headerText = {
   minWidth: "250px",
 };
 
-const title = {
+const titleStyle = {
   margin: 0,
   marginBottom: theme.space[2],
   fontSize: theme.typography.sizes["3xl"],
@@ -45,7 +45,7 @@ const title = {
   color: theme.colors.text,
 };
 
-const subtitle = {
+const subtitleStyle = {
   margin: 0,
   fontSize: theme.typography.sizes.base,
   color: theme.colors.textSubtle,
@@ -85,6 +85,7 @@ const modeButton = (active) => ({
   transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
   fontFamily: theme.typography.fonts.primary,
   outline: "none",
+  opacity: 1,
 });
 
 const mixedModeToggle = {
@@ -99,12 +100,12 @@ const mixedModeToggle = {
 
 // Search input
 const searchContainer = {
-  marginBottom: theme.space[4],
+  marginBottom: theme.space[3],
 };
 
-const searchInput = {
+const searchInputStyle = {
   width: "100%",
-  maxWidth: "600px",
+  maxWidth: "760px",
   padding: `${theme.components.input.paddingY} ${theme.components.input.paddingX}`,
   borderRadius: theme.components.input.radius,
   border: `1px solid ${theme.components.input.border}`,
@@ -114,6 +115,104 @@ const searchInput = {
   background: theme.components.input.bg,
   transition: `all ${theme.motion.normal} ${theme.motion.easing}`,
   outline: "none",
+  boxSizing: "border-box",
+};
+
+// Filters UI (no-overlap layout using flex-wrap)
+const filtersWrap = {
+  marginBottom: theme.space[5],
+};
+
+const filtersSection = {
+  display: "grid",
+  gap: theme.space[3],
+};
+
+const filtersRowFull = {
+  width: "100%",
+};
+
+const filtersRowFlex = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: theme.space[3],
+  alignItems: "end",
+};
+
+const fieldCell = (basisPx = 240, grow = 1) => ({
+  flex: `${grow} 1 ${basisPx}px`,
+  minWidth: 0,
+});
+
+const fieldCellFixed = (basisPx = 170) => ({
+  flex: `0 1 ${basisPx}px`,
+  minWidth: 0,
+});
+
+const clearCell = {
+  flex: "0 0 auto",
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "end",
+  marginLeft: "auto",
+};
+
+const fieldLabel = {
+  fontSize: theme.typography.sizes.xs,
+  color: theme.colors.textSubtle,
+  fontWeight: theme.typography.weights.semibold,
+  marginBottom: 6,
+};
+
+const inputStyle = {
+  width: "100%",
+  padding: `${theme.components.input.paddingY} ${theme.components.input.paddingX}`,
+  borderRadius: theme.components.input.radius,
+  border: `1px solid ${theme.components.input.border}`,
+  fontSize: theme.typography.sizes.sm,
+  fontFamily: theme.typography.fonts.primary,
+  color: theme.colors.text,
+  background: theme.components.input.bg,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+const selectStyle = { ...inputStyle };
+
+const dateInputStyle = {
+  ...inputStyle,
+  // Helps prevent weird overlay behavior on some browsers by ensuring the control is fully self-contained.
+  appearance: "auto",
+};
+
+const pillRow = {
+  display: "flex",
+  gap: theme.space[2],
+  flexWrap: "wrap",
+};
+
+const pill = (active) => ({
+  padding: `8px 12px`,
+  borderRadius: theme.radius.pill,
+  border: `1px solid ${active ? theme.colors.primary : theme.colors.border}`,
+  background: active ? theme.colors.primarySoft : theme.colors.bg,
+  color: active ? theme.colors.primary : theme.colors.text,
+  cursor: "pointer",
+  fontWeight: theme.typography.weights.semibold,
+  fontSize: theme.typography.sizes.sm,
+  userSelect: "none",
+});
+
+const clearButton = {
+  padding: "10px 14px",
+  borderRadius: theme.components.button.radius,
+  border: `1px solid ${theme.colors.border}`,
+  background: theme.colors.bg,
+  color: theme.colors.text,
+  cursor: "pointer",
+  fontWeight: theme.typography.weights.semibold,
+  fontSize: theme.typography.sizes.sm,
+  whiteSpace: "nowrap",
 };
 
 // Notice/alert styles
@@ -204,9 +303,6 @@ const ctaButton = {
   marginTop: theme.space[2],
 };
 
-/**
- * Get mode-specific labels and helper text
- */
 function getModeLabels(mode, session) {
   if (mode === "public") {
     return {
@@ -221,17 +317,12 @@ function getModeLabels(mode, session) {
     const code = session?.communityCode;
     return {
       title: "Browse Community Listings",
-      subtitle: code
-        ? `Items from your community (${code})`
-        : "Items from your community",
+      subtitle: code ? `Items from your community (${code})` : "Items from your community",
       resultsLabel: "community listings",
-      emptyMessage: code
-        ? `No community listings found for ${code}.`
-        : "No community listings found.",
+      emptyMessage: code ? `No community listings found for ${code}.` : "No community listings found.",
     };
   }
 
-  // mixed mode
   return {
     title: "Browse All Listings",
     subtitle: "Public and community items",
@@ -240,123 +331,291 @@ function getModeLabels(mode, session) {
   };
 }
 
+// Helpers for advanced filters
+function normalizeStr(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function parseISODate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function getListingFulfillmentModes(listing) {
+  if (Array.isArray(listing?.fulfillmentModes) && listing.fulfillmentModes.length) {
+    return listing.fulfillmentModes.map((m) => normalizeStr(m));
+  }
+
+  const text = normalizeStr(`${listing?.description || ""} ${listing?.title || ""}`);
+
+  const hasPickup = text.includes("pickup") || text.includes("pick up") || text.includes("pick-up");
+  const hasDelivery =
+    text.includes("delivery") ||
+    text.includes("deliver") ||
+    text.includes("drop off") ||
+    text.includes("drop-off");
+
+  if (hasPickup && hasDelivery) return ["pickup", "delivery"];
+  if (hasDelivery) return ["delivery"];
+  if (hasPickup) return ["pickup"];
+  return ["pickup"];
+}
+
+function getListingLocationText(listing) {
+  return listing?.locationText || listing?.location || listing?.city || listing?.neighborhood || "";
+}
+
+function getListingAvailabilityWindow(listing) {
+  const a = listing?.availability;
+  const startRaw = a?.startDate || listing?.availableFrom || listing?.availabilityStart || listing?.startDate;
+  const endRaw = a?.endDate || listing?.availableTo || listing?.availabilityEnd || listing?.endDate;
+
+  const start = startRaw ? new Date(startRaw) : null;
+  const end = endRaw ? new Date(endRaw) : null;
+
+  const validStart = start && !Number.isNaN(start.getTime()) ? start : null;
+  const validEnd = end && !Number.isNaN(end.getTime()) ? end : null;
+
+  return { start: validStart, end: validEnd, isUnknown: !validStart && !validEnd };
+}
+
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+  if (!bStart && !bEnd) return true;
+  if (!aStart && !aEnd) return true;
+
+  const startA = aStart || new Date("1970-01-01T00:00:00");
+  const endA = aEnd || new Date("2999-12-31T00:00:00");
+  const startB = bStart || new Date("1970-01-01T00:00:00");
+  const endB = bEnd || new Date("2999-12-31T00:00:00");
+
+  return startA <= endB && startB <= endA;
+}
+
+function applyAdvancedFilters(listings, filters) {
+  const {
+    fulfillment = "either",
+    locationText = "",
+    radiusMiles = 10,
+    startDate = "",
+    endDate = "",
+  } = filters || {};
+
+  const locQ = normalizeStr(locationText);
+  const sd = parseISODate(startDate);
+  const ed = parseISODate(endDate);
+
+  return (Array.isArray(listings) ? listings : []).filter((l) => {
+    if (!l) return false;
+
+    if (fulfillment !== "either") {
+      const modes = getListingFulfillmentModes(l);
+      if (!modes.includes(fulfillment)) return false;
+    }
+
+    if (locQ) {
+      const locText = normalizeStr(getListingLocationText(l));
+      const fallback = normalizeStr(`${l.title || ""} ${l.category || ""}`);
+      if (!locText.includes(locQ) && !fallback.includes(locQ)) return false;
+    }
+
+    const distance = Number(l?.distanceMiles);
+    if (!Number.isNaN(distance) && typeof distance === "number") {
+      if (Number(radiusMiles) > 0 && distance > Number(radiusMiles)) return false;
+    }
+
+    if (sd || ed) {
+      const { start, end, isUnknown } = getListingAvailabilityWindow(l);
+      if (!isUnknown) {
+        if (!rangesOverlap(start, end, sd, ed)) return false;
+      }
+    }
+
+    return true;
+  });
+}
+
 export default function Browse() {
   const { listings, session, requests } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize search from URL
+  // URL params
   const initialQuery = searchParams.get("q") || "";
-  const [searchInput, setSearchInput] = useState(initialQuery);
+  const initialFulfillment = searchParams.get("fulfillment") || "either";
+  const initialLoc = searchParams.get("loc") || "";
+  const initialRadius = Number(searchParams.get("radius") || 10);
+  const initialStart = searchParams.get("start") || "";
+  const initialEnd = searchParams.get("end") || "";
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
 
-  // Determine effective browse mode from session
-  const effectiveMode = useMemo(
-    () => getEffectiveBrowseMode(session),
-    [session]
-  );
+  // Advanced filters
+  const [fulfillment, setFulfillment] = useState(initialFulfillment);
+  const [locationText, setLocationText] = useState(initialLoc);
+  const [radiusMiles, setRadiusMiles] = useState(Number.isNaN(initialRadius) ? 10 : initialRadius);
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
 
-  // Local mode state (can override effective mode)
+  // Determine effective browse mode from session
+  const effectiveMode = useMemo(() => getEffectiveBrowseMode(session), [session]);
   const [currentMode, setCurrentMode] = useState(() => effectiveMode);
   const [showMixed, setShowMixed] = useState(false);
 
-  // Sync mode when session changes
   useEffect(() => {
     const newEffectiveMode = getEffectiveBrowseMode(session);
     setCurrentMode(newEffectiveMode);
     setShowMixed(false);
   }, [session]);
 
-  // Create stable debounced function using useRef
+  // Stable ref to setSearchParams
   const setSearchParamsRef = useRef(setSearchParams);
   setSearchParamsRef.current = setSearchParams;
 
+  // Debounced URL sync for q
   const debouncedSearchRef = useRef(
     debounce((query) => {
       setDebouncedQuery(query);
+
       const newParams = new URLSearchParams(window.location.search);
-      if (query.trim()) {
-        newParams.set("q", query);
-      } else {
-        newParams.delete("q");
-      }
+      if (query.trim()) newParams.set("q", query);
+      else newParams.delete("q");
+
       setSearchParamsRef.current(newParams, { replace: true });
     }, 300)
   );
 
-  // Handle search input change
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    setSearchInput(value);
+    setSearchQuery(value);
     debouncedSearchRef.current(value);
   };
+
+  // Sync filter params immediately
+  useEffect(() => {
+    const newParams = new URLSearchParams(window.location.search);
+
+    if (fulfillment && fulfillment !== "either") newParams.set("fulfillment", fulfillment);
+    else newParams.delete("fulfillment");
+
+    if (locationText.trim()) newParams.set("loc", locationText.trim());
+    else newParams.delete("loc");
+
+    if (radiusMiles) newParams.set("radius", String(radiusMiles));
+    else newParams.delete("radius");
+
+    if (startDate) newParams.set("start", startDate);
+    else newParams.delete("start");
+
+    if (endDate) newParams.set("end", endDate);
+    else newParams.delete("end");
+
+    setSearchParamsRef.current(newParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fulfillment, locationText, radiusMiles, startDate, endDate]);
 
   // Sync URL param with local state on mount only
   useEffect(() => {
     const urlQ = searchParams.get("q") || "";
-    if (urlQ && urlQ !== searchInput) {
-      setSearchInput(urlQ);
+    if (urlQ && urlQ !== searchQuery) {
+      setSearchQuery(urlQ);
       setDebouncedQuery(urlQ);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, []);
 
-  // Determine actual mode (mixed if enabled)
   const actualMode = showMixed && currentMode === "community" ? "mixed" : currentMode;
 
-  // Get visible listings using selectors
-  const visibleListings = useMemo(() => {
+  const safeListings = Array.isArray(listings) ? listings : [];
+  const safeRequests = Array.isArray(requests) ? requests : [];
+
+  const baseVisibleListings = useMemo(() => {
     try {
-      if (!listings || !Array.isArray(listings)) return [];
-      return getVisibleListings(listings, actualMode, session, debouncedQuery);
+      return getVisibleListings(safeListings, actualMode, session, debouncedQuery);
     } catch (error) {
       console.error("Error getting visible listings:", error);
       return [];
     }
-  }, [listings, actualMode, session, debouncedQuery]);
+  }, [safeListings, actualMode, session, debouncedQuery]);
 
-  // Get hidden community match count for growth signals
+  const filteredVisibleListings = useMemo(() => {
+    return applyAdvancedFilters(baseVisibleListings, {
+      fulfillment,
+      locationText,
+      radiusMiles,
+      startDate,
+      endDate,
+    });
+  }, [baseVisibleListings, fulfillment, locationText, radiusMiles, startDate, endDate]);
+
   const hiddenCommunityMatches = useMemo(() => {
     try {
-      if (!listings || !Array.isArray(listings)) return 0;
-      return getHiddenCommunityMatchCount(listings, debouncedQuery);
+      return getHiddenCommunityMatchCount(safeListings, debouncedQuery);
     } catch (error) {
       console.error("Error getting hidden matches:", error);
       return 0;
     }
-  }, [listings, debouncedQuery]);
+  }, [safeListings, debouncedQuery]);
 
-  // Get public results count for growth signals
   const publicResultsCount = useMemo(() => {
     try {
       if (!debouncedQuery.trim()) return 0;
-      if (!listings || !Array.isArray(listings)) return 0;
-      return getVisibleListings(listings, "public", null, debouncedQuery).length;
+      return getVisibleListings(safeListings, "public", null, debouncedQuery).length;
     } catch (error) {
       console.error("Error getting public results count:", error);
       return 0;
     }
-  }, [listings, debouncedQuery]);
+  }, [safeListings, debouncedQuery]);
 
-  // Mode labels
-  const modeLabels = useMemo(
-    () => getModeLabels(actualMode, session),
-    [actualMode, session]
-  );
+  const modeLabels = useMemo(() => getModeLabels(actualMode, session), [actualMode, session]);
 
-  // Check if needs community code
-  const needsCommunityCode =
-    actualMode === "community" && !session?.communityCode;
+  const needsCommunityCode = actualMode === "community" && !session?.communityCode;
 
-  // Show hidden supply note
   const showHiddenSupplyNote =
     actualMode === "public" &&
     debouncedQuery.trim().length > 0 &&
     publicResultsCount === 0 &&
     hiddenCommunityMatches > 0;
 
-  // Safety check - ensure listings is an array
-  const safeListings = Array.isArray(listings) ? listings : [];
-  const safeRequests = Array.isArray(requests) ? requests : [];
+  const showRadiusHelperNote = useMemo(() => {
+    const anyDistance = baseVisibleListings.some(
+      (l) => typeof Number(l?.distanceMiles) === "number" && !Number.isNaN(Number(l?.distanceMiles))
+    );
+    return !anyDistance && (locationText.trim() || radiusMiles);
+  }, [baseVisibleListings, locationText, radiusMiles]);
+
+  const showDateHelperNote = useMemo(() => {
+    if (!startDate && !endDate) return false;
+    const anyHasWindow = baseVisibleListings.some((l) => {
+      const a = l?.availability;
+      return Boolean(a?.startDate || a?.endDate || l?.availableFrom || l?.availableTo);
+    });
+    return !anyHasWindow;
+  }, [baseVisibleListings, startDate, endDate]);
+
+  const hasActiveFilters =
+    fulfillment !== "either" ||
+    Boolean(locationText.trim()) ||
+    Boolean(startDate) ||
+    Boolean(endDate) ||
+    Number(radiusMiles) !== 10;
+
+  const handleClearFilters = () => {
+    setFulfillment("either");
+    setLocationText("");
+    setRadiusMiles(10);
+    setStartDate("");
+    setEndDate("");
+
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.delete("fulfillment");
+    newParams.delete("loc");
+    newParams.delete("radius");
+    newParams.delete("start");
+    newParams.delete("end");
+    setSearchParams(newParams, { replace: true });
+  };
 
   return (
     <div style={pageContainer}>
@@ -370,25 +629,26 @@ export default function Browse() {
           outline: 2px solid ${theme.colors.focusRing};
           outline-offset: 2px;
         }
-        .search-input:focus {
+        .search-input:focus,
+        .filter-input:focus {
           border-color: ${theme.components.input.borderFocus} !important;
           box-shadow: ${theme.components.input.shadowFocus} !important;
         }
-        .listing-card:focus-visible {
-          outline: 2px solid ${theme.colors.focusRing};
-          outline-offset: 2px;
-        }
+
+        /* Extra safety: ensure all form controls size predictably */
+        input, select { box-sizing: border-box; }
       `}</style>
 
       <div style={headerSection}>
         <div style={headerText}>
-          <h1 style={title}>{modeLabels.title}</h1>
-          <p style={subtitle}>{modeLabels.subtitle}</p>
+          <h1 style={titleStyle}>{modeLabels.title}</h1>
+          <p style={subtitleStyle}>{modeLabels.subtitle}</p>
         </div>
 
         <div style={controlsSection}>
           <div style={modeSwitchRow}>
             <span style={modeLabel}>Viewing as</span>
+
             <button
               onClick={() => {
                 setCurrentMode("public");
@@ -396,10 +656,10 @@ export default function Browse() {
               }}
               className="mode-button"
               style={modeButton(currentMode === "public")}
-              disabled={!session}
             >
               Public
             </button>
+
             {session?.role === "community" && (
               <>
                 <button
@@ -412,6 +672,7 @@ export default function Browse() {
                 >
                   Community
                 </button>
+
                 {currentMode === "community" && (
                   <label style={mixedModeToggle}>
                     <input
@@ -440,7 +701,10 @@ export default function Browse() {
           <div style={noticeTitle}>Community listings require a community code</div>
           <div>
             Go to{" "}
-            <Link to="/get-started" style={{ color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
+            <Link
+              to="/get-started"
+              style={{ color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}
+            >
               Get Started
             </Link>{" "}
             and sign in as a Community Member using your code.
@@ -451,21 +715,112 @@ export default function Browse() {
       <div style={searchContainer}>
         <input
           type="text"
-          value={searchInput}
+          value={searchQuery}
           onChange={handleSearchChange}
           placeholder="Search items, category, location..."
           className="search-input"
-          style={searchInput}
+          style={searchInputStyle}
           aria-label="Search listings"
         />
+      </div>
+
+      {/* Advanced filters */}
+      <div style={filtersWrap}>
+        <div style={filtersSection}>
+          <div style={filtersRowFull}>
+            <div style={fieldLabel}>Pickup / delivery</div>
+            <div style={pillRow}>
+              <button type="button" style={pill(fulfillment === "either")} onClick={() => setFulfillment("either")}>
+                Either
+              </button>
+              <button type="button" style={pill(fulfillment === "pickup")} onClick={() => setFulfillment("pickup")}>
+                Pickup
+              </button>
+              <button type="button" style={pill(fulfillment === "delivery")} onClick={() => setFulfillment("delivery")}>
+                Delivery
+              </button>
+            </div>
+          </div>
+
+          <div style={filtersRowFlex}>
+            <div style={fieldCell(320, 2)}>
+              <div style={fieldLabel}>Location</div>
+              <input
+                className="filter-input"
+                style={inputStyle}
+                value={locationText}
+                onChange={(e) => setLocationText(e.target.value)}
+                placeholder="Neighborhood, city, or building"
+                aria-label="Location filter"
+              />
+            </div>
+
+            <div style={fieldCellFixed(170)}>
+              <div style={fieldLabel}>Radius</div>
+              <select
+                className="filter-input"
+                style={selectStyle}
+                value={radiusMiles}
+                onChange={(e) => setRadiusMiles(Number(e.target.value))}
+                aria-label="Radius filter"
+              >
+                <option value={5}>5 mi</option>
+                <option value={10}>10 mi</option>
+                <option value={25}>25 mi</option>
+                <option value={50}>50 mi</option>
+              </select>
+            </div>
+
+            <div style={fieldCellFixed(220)}>
+              <div style={fieldLabel}>Start date</div>
+              <input
+                type="date"
+                className="filter-input"
+                style={dateInputStyle}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                aria-label="Start date filter"
+              />
+            </div>
+
+            <div style={fieldCellFixed(220)}>
+              <div style={fieldLabel}>End date</div>
+              <input
+                type="date"
+                className="filter-input"
+                style={dateInputStyle}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                aria-label="End date filter"
+              />
+            </div>
+
+            <div style={clearCell}>
+              <button type="button" style={clearButton} onClick={handleClearFilters} disabled={!hasActiveFilters}>
+                Clear filters
+              </button>
+            </div>
+          </div>
+
+          {showRadiusHelperNote && (
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.textSubtle }}>
+              Radius is a soft filter in MVP until listings have precise geo distance (later: lat/lng or zip).
+            </div>
+          )}
+
+          {showDateHelperNote && (
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.textSubtle }}>
+              Date filtering is a soft filter in MVP until listings have availability windows (later: availableFrom/availableTo + booking conflicts).
+            </div>
+          )}
+        </div>
       </div>
 
       {showHiddenSupplyNote && (
         <div style={notice}>
           <div style={noticeTitle}>No public results for "{debouncedQuery.trim()}"</div>
           <div>
-            There are items matching this search inside communities nearby. Want access? Help
-            onboard your building or HOA.
+            There are items matching this search inside communities nearby. Want access? Help onboard your building or HOA.
           </div>
           <div style={noticeActions}>
             <Link to="/request-community" style={noticeButton}>
@@ -479,23 +834,32 @@ export default function Browse() {
       )}
 
       <div style={resultsSummary}>
-        Showing <strong>{visibleListings.length}</strong> {modeLabels.resultsLabel}
+        Showing <strong>{filteredVisibleListings.length}</strong> {modeLabels.resultsLabel}
         {debouncedQuery.trim() && ` matching "${debouncedQuery.trim()}"`}
+        {hasActiveFilters && <span> • filters active</span>}
       </div>
 
-      {visibleListings.length === 0 ? (
+      {filteredVisibleListings.length === 0 ? (
         <div style={emptyState}>
           <p>{modeLabels.emptyMessage}</p>
+          {hasActiveFilters && (
+            <button type="button" style={clearButton} onClick={handleClearFilters}>
+              Clear filters
+            </button>
+          )}
           {!session && (
-            <Link to="/get-started" style={ctaButton}>
-              Get Started
-            </Link>
+            <div>
+              <Link to="/get-started" style={ctaButton}>
+                Get Started
+              </Link>
+            </div>
           )}
         </div>
       ) : (
         <div style={gridContainer}>
-          {visibleListings.map((listing) => {
+          {filteredVisibleListings.map((listing) => {
             if (!listing || !listing.id) return null;
+
             const scope = getListingScope(listing);
             const availabilityStatus = getAvailabilityHint(listing, safeRequests);
             const availabilityData = getAvailabilityData(listing, safeRequests);
